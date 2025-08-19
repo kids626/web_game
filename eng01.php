@@ -93,6 +93,7 @@
 			<div class="title">題目（大寫）</div>
 			<div id="big" class="big">A</div>
 			<div class="hint">請點選對應的小寫</div>
+			<button id="speakBtn" class="secondary" style="margin-top:8px" aria-label="播放發音">🔊 發音</button>
 		</div>
 
 		<div class="card">
@@ -114,6 +115,16 @@
 		</div>
 	</div>
 
+	<!-- 音效元素 -->
+	<audio id="correctSound" preload="auto" playsinline>
+		<source src="audio/quiz/correct.wav" type="audio/wav">
+		<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT" type="audio/wav">
+	</audio>
+	<audio id="wrongSound" preload="auto" playsinline>
+		<source src="audio/quiz/error.mp3" type="audio/mpeg">
+		<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT" type="audio/wav">
+	</audio>
+
 	<script>
 		const letters = Array.from({length:26},(_,i)=>String.fromCharCode(65+i));
 		const totalQuestionsDefault = 10;
@@ -126,10 +137,72 @@
 		const elBad = document.getElementById('bad');
 		const endPanel = document.getElementById('end');
 		const againBtn = document.getElementById('againBtn');
+		const speakBtn = document.getElementById('speakBtn');
 		const scoreText = document.getElementById('scoreText');
 		const timeText = document.getElementById('timeText');
+		
+		// 音效元素
+		const correctSound = document.getElementById('correctSound');
+		const wrongSound = document.getElementById('wrongSound');
 
 		let state;
+
+		function pronounce(letter){
+			try{
+				if(!('speechSynthesis' in window)) return;
+				speechSynthesis.cancel();
+				const u = new SpeechSynthesisUtterance(letter);
+				u.lang = 'en-US';
+				u.rate = 0.9;
+				u.pitch = 1.0;
+				speechSynthesis.speak(u);
+			}catch(_){/* 忽略發音失敗 */}
+		}
+
+		// 綁定發音事件（按鈕 / 大寫字母）
+		function bindPronounceEvents(){
+			if(speakBtn){
+				speakBtn.addEventListener('click',()=>{
+					const letter = (state && state.currentUpper) ? state.currentUpper : (elBig.textContent||'').trim();
+					if(letter) pronounce(letter);
+				});
+			}
+			if(elBig){
+				elBig.style.cursor = 'pointer';
+				elBig.title = '點我播放發音';
+				elBig.setAttribute('tabindex','0');
+				elBig.addEventListener('click',()=>{
+					const letter = (state && state.currentUpper) ? state.currentUpper : (elBig.textContent||'').trim();
+					if(letter) pronounce(letter);
+				});
+				elBig.addEventListener('keydown',(e)=>{
+					if(e.key === 'Enter' || e.key === ' '){
+						e.preventDefault();
+						const letter = (state && state.currentUpper) ? state.currentUpper : (elBig.textContent||'').trim();
+						if(letter) pronounce(letter);
+					}
+				});
+			}
+		}
+
+		// 播放音效函數
+		function playSound(audioElement) {
+			audioElement.currentTime = 0;
+			audioElement.play().catch(e => {
+				// 忽略音效播放錯誤
+				console.log('音效播放失敗:', e);
+			});
+		}
+
+		// 播放答對音效
+		function playCorrectSound() {
+			playSound(correctSound);
+		}
+
+		// 播放答錯音效
+		function playWrongSound() {
+			playSound(wrongSound);
+		}
 
 		function shuffle(a){
 			for(let i=a.length-1;i>0;i--){
@@ -197,6 +270,8 @@
 				state.ok++;
 				elOk.textContent = state.ok;
 				state.locked = true;
+				// 播放答對音效
+				playCorrectSound();
 				setTimeout(()=>{ nextQuestion(); }, 600);
 			}else{
 				li.classList.add('wrong');
@@ -204,6 +279,8 @@
 				li.style.pointerEvents = 'none';
 				state.bad++;
 				elBad.textContent = state.bad;
+				// 播放答錯音效
+				playWrongSound();
 			}
 		}
 
@@ -249,6 +326,7 @@
 
 		againBtn.addEventListener('click', init);
 
+		bindPronounceEvents();
 		init();
 	</script>
 </body>
