@@ -93,7 +93,6 @@
 			<div class="title">題目（大寫）</div>
 			<div id="big" class="big">A</div>
 			<div class="hint">請點選對應的小寫</div>
-			<button id="speakBtn" class="secondary" style="margin-top:8px" aria-label="播放發音">🔊 發音</button>
 		</div>
 
 		<div class="card">
@@ -137,7 +136,6 @@
 		const elBad = document.getElementById('bad');
 		const endPanel = document.getElementById('end');
 		const againBtn = document.getElementById('againBtn');
-		const speakBtn = document.getElementById('speakBtn');
 		const scoreText = document.getElementById('scoreText');
 		const timeText = document.getElementById('timeText');
 		
@@ -161,12 +159,6 @@
 
 		// 綁定發音事件（按鈕 / 大寫字母）
 		function bindPronounceEvents(){
-			if(speakBtn){
-				speakBtn.addEventListener('click',()=>{
-					const letter = (state && state.currentUpper) ? state.currentUpper : (elBig.textContent||'').trim();
-					if(letter) pronounce(letter);
-				});
-			}
 			if(elBig){
 				elBig.style.cursor = 'pointer';
 				elBig.title = '點我播放發音';
