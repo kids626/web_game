@@ -1,5 +1,20 @@
 <?php
-?><!doctype html>
+// 瀏覽次數讀取（避免重整即加計，實際遞增交由前端呼叫 API）
+$counterFile = __DIR__ . DIRECTORY_SEPARATOR . 'project' . DIRECTORY_SEPARATOR . 'eng01_views.txt';
+$viewCount = 0;
+
+// 確保資料夾與檔案存在
+if (!is_dir(__DIR__ . DIRECTORY_SEPARATOR . 'project')) {
+	@mkdir(__DIR__ . DIRECTORY_SEPARATOR . 'project', 0777, true);
+}
+if (!is_file($counterFile)) {
+	@file_put_contents($counterFile, '0', LOCK_EX);
+}
+// 直接讀取目前數值
+$raw = @file_get_contents($counterFile);
+$viewCount = is_numeric(trim((string)$raw)) ? (int)trim((string)$raw) : 0;
+?>
+<!doctype html>
 <html lang="zh-Hant">
 <head>
 	<meta charset="utf-8">
@@ -84,6 +99,7 @@
 		.small{font-size:12px;color:var(--muted)}
 		@media (max-width: 720px){
 			.app{grid-template-columns:1fr}
+			body{padding-bottom:140px}
 		}
 	</style>
 </head>
@@ -114,6 +130,23 @@
 		</div>
 	</div>
 
+	<!-- 底部固定區塊：小 QR（可點擊放大） 與瀏覽次數 -->
+	<div class="small" style="position:fixed;bottom:10px;left:0;right:0;opacity:.9;padding:10px;display:flex;align-items:center;justify-content:center;gap:12px;text-align:center">
+		<div id="qrCode" title="點我放大" style="width:5px;height:5px;cursor:pointer"></div>
+		<span>瀏覽次數 <b id="viewCount"><?php echo htmlspecialchars((string)$viewCount, ENT_QUOTES, 'UTF-8'); ?></b></span>
+	</div>
+
+	<!-- QR 放大覆蓋層 -->
+	<div id="qrOverlay" style="position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999">
+		<div style="background:#0f2036;border:1px solid #223047;border-radius:12px;padding:16px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,.45)">
+			<div class="small" style="margin-bottom:8px;color:#cfe1ff">掃描在手機開啟本頁</div>
+			<div id="qrCodeLarge" style="width:260px;height:260px;margin:0 auto"></div>
+			<div style="margin-top:10px">
+				<button id="qrClose" class="secondary">關閉</button>
+			</div>
+		</div>
+	</div>
+
 	<!-- 音效元素 -->
 	<audio id="correctSound" preload="auto" playsinline>
 		<source src="audio/quiz/correct.wav" type="audio/wav">
@@ -121,8 +154,11 @@
 	</audio>
 	<audio id="wrongSound" preload="auto" playsinline>
 		<source src="audio/quiz/error.mp3" type="audio/mpeg">
-		<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT" type="audio/wav">
+		<source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10 IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZiTYIG2m98OScTgwOUarm7blmGgU7k9n1unEiBC13yO/eizEIHWq+8+OWT" type="audio/wav">
 	</audio>
+
+	<!-- 產生 QRCode 的小型程式庫 -->
+	<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
 	<script>
 		const letters = Array.from({length:26},(_,i)=>String.fromCharCode(65+i));
@@ -138,6 +174,7 @@
 		const againBtn = document.getElementById('againBtn');
 		const scoreText = document.getElementById('scoreText');
 		const timeText = document.getElementById('timeText');
+		const viewCountEl = document.getElementById('viewCount');
 		
 		// 音效元素
 		const correctSound = document.getElementById('correctSound');
@@ -320,6 +357,55 @@
 
 		bindPronounceEvents();
 		init();
+
+		// 產生底部 QR：小圖與大圖
+		try{
+			if(window.QRCode){
+				const url = 'https://shous.ddns.net/web_game/eng01.php';
+				const smallBox = document.getElementById('qrCode');
+				const largeBox = document.getElementById('qrCodeLarge');
+				if(smallBox && smallBox.childNodes.length === 0){
+					new QRCode(smallBox, { text: url, width: 5, height: 5, correctLevel: QRCode.CorrectLevel.M });
+				}
+				if(largeBox && largeBox.childNodes.length === 0){
+					new QRCode(largeBox, { text: url, width: 260, height: 260, correctLevel: QRCode.CorrectLevel.M });
+				}
+			}
+		}catch(_){/* 略過 QR 產生錯誤 */}
+
+		// 點擊顯示 / 關閉放大 QR
+		(function bindQrOverlay(){
+			const overlay = document.getElementById('qrOverlay');
+			const small = document.getElementById('qrCode');
+			const closeBtn = document.getElementById('qrClose');
+			if(small && overlay){
+				small.addEventListener('click',()=>{ overlay.style.display='flex'; });
+				overlay.addEventListener('click', (e)=>{ if(e.target === overlay) overlay.style.display='none'; });
+			}
+			if(closeBtn && overlay){
+				closeBtn.addEventListener('click',()=>{ overlay.style.display='none'; });
+			}
+		})();
+
+		// 瀏覽次數：同分頁工作階段只計一次（避免重整就加計）
+		(async function manageViewCounter(){
+			try{
+				const countedKey = 'eng01_view_counted';
+				const mode = sessionStorage.getItem(countedKey) ? 'get' : 'inc';
+				const res = await fetch('api/views.php',{
+					method:'POST',
+					headers:{'Content-Type':'application/json'},
+					body: JSON.stringify({page:'eng01', mode})
+				});
+				const data = await res.json();
+				if(data && typeof data.count === 'number' && viewCountEl){
+					viewCountEl.textContent = String(data.count);
+				}
+				if(mode === 'inc'){
+					sessionStorage.setItem(countedKey,'1');
+				}
+			}catch(_){/* 失敗時沿用伺服器初始值 */}
+		})();
 	</script>
 </body>
 </html>
